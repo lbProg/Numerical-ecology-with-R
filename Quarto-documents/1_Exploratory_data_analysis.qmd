@@ -1,0 +1,174 @@
+---
+title: "Exploratory data analysis"
+format: html
+embed-resources: true
+lightbox: true
+toc: true
+toc-location: right-body
+---
+
+# Load libraries and data
+
+```{r}
+library(vegan)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(here)
+```
+
+```{r}
+load(here("../NEwR-2ed_code_data/NEwR2-Data/Doubs.RData"))
+```
+
+# First contact
+
+```{r}
+colnames(spe)
+rownames(spe)
+summary(spe)
+range(spe)
+apply(spe, 2, range)
+```
+
+Barplot of the distribution, all species confounded
+```{r}
+ab <- table(unlist(spe))
+
+barplot(
+    ab,
+    las = 1,
+    xlab = "Abundance class",
+    ylab = "Frequency",
+    col = gray(5 : 0 / 5)
+)
+```
+
+```{r}
+ggplot(as.data.frame(ab), aes(x = Var1, y = Freq)) +
+    geom_bar(stat = "identity") +
+    labs(x = "Abundance class", y = "Frequency") +
+    theme_bw()
+```
+
+# A closer look
+
+```{r}
+ggplot(spa, aes(x = X, y = Y)) +
+    geom_path(color = "lightblue") +
+    geom_text(aes(label = rownames(spa)), color = "red") +
+    labs(x = "x coordinate (km)", y = "y coordinate (km)") +
+    annotate("text", x = 68, y = 20, label = "Upstream", size = 5) +
+    annotate("text", x = 15, y = 35, label = "Downstream", size = 5) +
+    theme_test()
+```
+
+## Maps of some fish species
+
+```{r}
+spe_four <- spe |>
+    select(Satr, Thth) |>
+    rownames_to_column(var = "site") |>
+    mutate(X = spa$X, Y = spa$Y) |>
+    pivot_longer(
+        cols = c(Satr, Thth),
+        names_to = "species",
+        values_to = "abundance"
+    )
+
+ggplot(spe_four, aes(x = X, y = Y)) +
+    geom_path(color = "lightblue") +
+    geom_point(aes(size = abundance), shape = 1, color = "red") +
+    scale_size_continuous(range = c(-1, 8)) +
+    labs(x = "x coordinate (km)", y = "y coordinate (km)") +
+    facet_wrap(vars(species)) +
+    theme_test()
+```
+
+## Species richness along the river
+
+```{r}
+site_richness <- apply(spe > 0, 1, sum)
+site_richness_df <- spa |>
+    mutate(richness = site_richness)
+
+ggplot(site_richness_df, aes(x = X, y = Y)) +
+    geom_path(color = "lightblue") +
+    geom_point(aes(size = richness), color = "red") +
+    scale_size_continuous(range = c(-1, 10)) +
+    labs(x = "x coordinate (km)", y = "y coordinate (km)") +
+    theme_test()
+```
+
+# Ecological data transformation
+
+```{r}
+spe_five <- spe[, 1:5]
+
+plot_abundance <- function(data) {
+    data |>
+        rownames_to_column(var = "site") |>
+        mutate(site = as.integer(site)) |>
+        pivot_longer(cols = 2:6, names_to = "species", values_to = "abundance") |>
+        ggplot(aes(x = site, y = abundance, fill = species)) +
+        geom_bar(stat = "identity") +
+        scale_x_continuous(breaks = 1:30) +
+        theme_bw()
+}
+
+# Raw abundance
+plot_abundance(spe_five)
+
+# Presence-absence
+plot_abundance(decostand(spe_five, method = "pa"))
+
+# Standardization by maximum of each species
+plot_abundance(decostand(spe_five, method = "max"))
+
+# Standardization by species totals
+plot_abundance(decostand(spe_five, "total", MARGIN = 2))
+
+# Standardization by rows
+plot_abundance(decostand(spe_five, "total"))
+
+# Standardization by rows - Chord transformation
+plot_abundance(decostand(spe_five, "normalize"))
+
+# Square-root of relative abundance per site - Hellinger transformation
+plot_abundance(decostand(spe_five, "hellinger"))
+
+# Double standardization by columns and rows - Chi-square transformation
+plot_abundance(decostand(spe_five, "chi.square"))
+
+# Winsconsin standardization
+plot_abundance(wisconsin(spe_five))
+```
+
+# Environmental data
+
+```{r}
+summary(env)
+```
+
+```{r}
+library(GGally)
+
+# ggpairs(env)
+```
+
+```{r}
+env |>
+    select(ele, dis, oxy, nit) |>
+    rownames_to_column("site") |>
+    mutate(X = spa$X, Y = spa$Y) |>
+    pivot_longer(ele:nit, names_to = "variable", values_to = "value") |>
+    group_by(variable) |>
+    mutate(scaled_value = value / max(value)) |>
+    ggplot(aes(x = X, y = Y,)) +
+    geom_path() +
+    geom_point(aes(color = variable, size = scaled_value)) +
+    scale_size_continuous(range = c(-1, 5)) +
+    facet_wrap(vars(variable)) +
+    theme_test()
+```
