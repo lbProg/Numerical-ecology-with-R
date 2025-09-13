@@ -1,0 +1,48 @@
+---
+title: "Association measures and matrices"
+author: Lucien Bastin
+date: 2025-09-13
+format: html
+knitr:
+    opts_chunk:
+        message: FALSE
+        warning: FALSE
+embed-resources: TRUE
+lightbox: TRUE
+toc: TRUE
+toc-location: right-body
+---
+
+# Libraries
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(here)
+```
+
+# Scripts
+
+```{r}
+source(here("NEwR-2ed_code_data/NEwR2-Functions/coldiss.R"))
+source(here("NEwR-2ed_code_data/NEwR2-Functions/panelutils.R"))
+```
+
+# Data
+
+```{r}
+load(here("NEwR-2ed_code_data/NEwR2-Data/Doubs.RData"))
+
+# Remove empty site 8
+spe <- spe[-8, ]
+env <- env[-8, ]
+spa <- spa[-8, ]
+```
+
+# Q mode : dissimilarity matrices among objects
+
+## Quantitative species data
+
+```{r}
+
+```
