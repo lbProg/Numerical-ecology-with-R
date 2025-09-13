@@ -1,6 +1,12 @@
 ---
 title: "Exploratory data analysis"
+author: Lucien Bastin
+date: 2025-09-13
 format: html
+knitr:
+    opts_chunk:
+        message: FALSE
+        warning: FALSE
 embed-resources: true
 lightbox: true
 toc: true
@@ -10,16 +16,17 @@ toc-location: right-body
 # Load libraries and data
 
 ```{r}
-library(vegan)
 library(ggplot2)
+library(ggpubr)
 library(dplyr)
-library(tidyr)
-library(tibble)
 library(here)
+library(tibble)
+library(tidyr)
+library(vegan)
 ```
 
 ```{r}
-load(here("../NEwR-2ed_code_data/NEwR2-Data/Doubs.RData"))
+load(here("NEwR-2ed_code_data/NEwR2-Data/Doubs.RData"))
 ```
 
 # First contact
@@ -33,21 +40,13 @@ apply(spe, 2, range)
 ```
 
 Barplot of the distribution, all species confounded
+
 ```{r}
 ab <- table(unlist(spe))
 
-barplot(
-    ab,
-    las = 1,
-    xlab = "Abundance class",
-    ylab = "Frequency",
-    col = gray(5 : 0 / 5)
-)
-```
-
-```{r}
-ggplot(as.data.frame(ab), aes(x = Var1, y = Freq)) +
-    geom_bar(stat = "identity") +
+ggplot(as.data.frame(ab), aes(x = Var1, y = Freq, fill = Var1)) +
+    geom_bar(stat = "identity", color = "black") +
+    scale_fill_manual(values = gray(5:0 / 5), guide = "none") +
     labs(x = "Abundance class", y = "Frequency") +
     theme_bw()
 ```
@@ -110,7 +109,11 @@ plot_abundance <- function(data) {
     data |>
         rownames_to_column(var = "site") |>
         mutate(site = as.integer(site)) |>
-        pivot_longer(cols = 2:6, names_to = "species", values_to = "abundance") |>
+        pivot_longer(
+            cols = 2:6,
+            names_to = "species",
+            values_to = "abundance"
+        ) |>
         ggplot(aes(x = site, y = abundance, fill = species)) +
         geom_bar(stat = "identity") +
         scale_x_continuous(breaks = 1:30) +
@@ -152,23 +155,131 @@ summary(env)
 ```
 
 ```{r}
-library(GGally)
-
-# ggpairs(env)
-```
-
-```{r}
-env |>
-    select(ele, dis, oxy, nit) |>
+env_long <- env |>
+    select(dfs, ele, dis, oxy, nit) |>
     rownames_to_column("site") |>
     mutate(X = spa$X, Y = spa$Y) |>
     pivot_longer(ele:nit, names_to = "variable", values_to = "value") |>
+    mutate(
+        variable = factor(variable, levels = c("ele", "dis", "oxy", "nit"))
+    ) |>
     group_by(variable) |>
-    mutate(scaled_value = value / max(value)) |>
-    ggplot(aes(x = X, y = Y,)) +
+    mutate(scaled_value = value / max(value))
+```
+
+```{r}
+ggplot(env_long, aes(x = X, y = Y)) +
     geom_path() +
     geom_point(aes(color = variable, size = scaled_value)) +
     scale_size_continuous(range = c(-1, 5)) +
     facet_wrap(vars(variable)) +
     theme_test()
+```
+
+Variation of some descriptors along the river.
+
+```{r}
+ggplot(env_long, aes(x = dfs, y = value, color = variable)) +
+    geom_line(show.legend = FALSE) +
+    labs(x = "Distance from source (km)", y = element_blank()) +
+    facet_wrap(
+        vars(variable),
+        scales = "free",
+        strip.position = "left",
+        labeller = as_labeller(
+            c(
+                ele = "Elevation (m)",
+                dis = "Discharge (m³/s)",
+                oxy = "Oxygen (mg/L)",
+                nit = "Nitrate (mg/L)"
+            )
+        )
+    ) +
+    theme_test() +
+    theme(strip.background = element_blank(), strip.placement = 'outside')
+```
+
+Bivariate relationships among environmental variables.
+
+```{r}
+#| fig-width: 12
+#| fig-height: 10
+
+panel.hist <- function(x, no.col = FALSE, ...) {
+  usr <- par("usr")
+  on.exit(par(usr))
+  par(usr = c(usr[1:2], 0, 1.5))
+  his <- hist(x, plot = FALSE)
+  breaks <- his$breaks
+  nB <- length(breaks)
+  y <- his$counts
+  y <- y / max(y)
+  if (no.col)
+    rect(breaks[-nB], 0, breaks[-1], y, col = "gray", ...)
+  else
+    rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+pairs(
+    env,
+    panel = panel.smooth,
+    diag.panel = panel.hist
+)
+```
+
+Log-transformations of the variables.
+
+```{r}
+slope_df <- data.frame(slo = env$slo)
+
+range(slope_df$slo)
+```
+
+```{r}
+slope_hist_plot <- ggplot(slope_df, aes(x = slo)) +
+    geom_histogram(
+        binwidth = 10,
+        breaks = seq(0, 50, 10),
+        fill = "orange",
+        color = "black"
+    ) +
+    labs(x = "Slope", y = "Frequency") +
+    theme_test()
+
+ln_slope_hist_plot <- ggplot(slope_df, aes(x = log(slo))) +
+    geom_histogram(
+        binwidth = 1,
+        breaks = seq(-2, 4, 1),
+        fill = "limegreen",
+        color = "black"
+    ) +
+    labs(x = "ln(slope)", y = "Frequency") +
+    theme_test()
+
+slope_box_plot <- ggplot(slope_df, aes(y = slo)) +
+    geom_boxplot(fill = "orange", width = 0.6) +
+    xlim(-1,1) +
+    labs(y = "Slope") +
+    theme_test()
+
+ln_slope_box_plot <- ggplot(slope_df, aes(y = log(slo))) +
+    geom_boxplot(fill = "limegreen", width = 0.6) +
+    xlim(-1,1) +
+    labs(y = "ln(slope)") +
+    theme_test()
+
+ggarrange(
+    slope_hist_plot,
+    ln_slope_hist_plot,
+    slope_box_plot,
+    ln_slope_box_plot,
+    nrow = 2,
+    ncol = 2
+)
+```
+
+Standardization of all environmental variables.
+
+```{r}
+env_z <- decostand(env, "standardize") # z-scores, mean = 0 and sd = 1
 ```
